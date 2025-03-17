@@ -28,7 +28,7 @@ export const LogoImage = ({ size = 'medium' }: LogoImageProps) => {
   return (
     <View style={styles.container}>
       <Image
-        source={{ uri: getLogoUri() }}
+        source={getLogoUri()}
         style={[styles.image, { width, height }]}
         resizeMode="contain"
       />

@@ -63,11 +63,6 @@ export default function AddHiveScreen() {
       return;
     }
 
-    if (!sensorId.trim()) {
-      Alert.alert('Error', 'Please enter a sensor ID');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       
@@ -75,7 +70,13 @@ export default function AddHiveScreen() {
       await addHive({
         name: name.trim(),
         apiaryId,
-        sensorId: sensorId.trim(),
+        temperature: 25.0,
+        humidity: 40.0,
+        weight: 10.0,
+        status: 'healthy',
+        lastUpdated: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
       
       // Return to the hives list

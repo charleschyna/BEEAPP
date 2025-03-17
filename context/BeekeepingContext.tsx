@@ -2,45 +2,57 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { 
-  fetchHives, 
+  fetchHives as serviceFetchHives, 
   subscribeToHives, 
-  fetchApiaries, 
+  fetchApiaries as serviceFetchApiaries, 
   subscribeToApiaries,
   fetchInspectionLogs,
   fetchHistoricalData,
-  addHive as apiAddHive,
-  updateHive as apiUpdateHive,
-  addApiary as apiAddApiary,
-  deleteHive as apiDeleteHive,
+  addHive as serviceAddHive,
+  updateHive as serviceUpdateHive,
+  addApiary as serviceAddApiary,
+  deleteHive as serviceDeleteHive,
   Hive as ServiceHive,
   Apiary as ServiceApiary,
   InspectionLog as ServiceInspectionLog,
   HistoricalData,
-  addInspectionLog as apiAddInspectionLog
+  addInspectionLog as serviceAddInspectionLog
 } from '@/services/hiveService';
 
 // Define our data types - compatible with UI but can map from service types
 export interface Hive {
   id: string;
   name: string;
-  apiaryId: string | null;
-  sensorId: string; 
+  apiaryId: string;
+  temperature: number;
+  humidity: number;
+  weight: number;
+  sound?: number;
+  status: 'healthy' | 'warning' | 'danger';
+  lastUpdated: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Apiary {
+  id: string;
+  name: string;
+  location: string;
+  imageUrl?: string;
 }
 
 export interface InspectionLog {
   id: string;
   hiveId: string;
-  date: string; // ISO date string
-  notes: string;
+  date: string;
   queenSpotted: boolean;
   broodPatterns: 'excellent' | 'good' | 'fair' | 'poor';
-  diseasesSigns: boolean;
-  diseasesNotes?: string;
   honeyStores: 'abundant' | 'good' | 'fair' | 'low';
   pollenStores: 'abundant' | 'adequate' | 'good' | 'fair' | 'low';
-  actions: string[];
+  diseasesSigns: boolean;
+  diseasesNotes?: string;
+  notes?: string;
+  actions?: string[];
 }
 
 export interface HiveHistoricalData {
@@ -51,39 +63,45 @@ export interface HiveHistoricalData {
   sound?: number;
 }
 
-export interface Apiary {
-  id: string;
-  name: string;
-  location: string;
-  imageUrl?: string;
-}
-
-// Mapper functions to convert between service and UI models
+// Mapping functions between service and UI types
 const mapServiceHiveToUIHive = (serviceHive: ServiceHive): Hive => ({
   id: serviceHive.id,
   name: serviceHive.name,
   apiaryId: serviceHive.apiary_id,
-  sensorId: serviceHive.sensor_id,
+  temperature: serviceHive.temperature,
+  humidity: serviceHive.humidity,
+  weight: serviceHive.weight,
+  sound: serviceHive.sound,
+  status: serviceHive.status,
+  lastUpdated: serviceHive.last_updated,
   createdAt: serviceHive.created_at,
-  updatedAt: serviceHive.updated_at,
+  updatedAt: serviceHive.updated_at
 });
 
-const mapUIHiveToServiceHive = (uiHive: Hive): Omit<ServiceHive, 'id'> => ({
+const mapUIHiveToServiceHive = (uiHive: Omit<Hive, 'id'>): Omit<ServiceHive, 'id' | 'user_id'> => ({
   name: uiHive.name,
   apiary_id: uiHive.apiaryId,
-  sensor_id: uiHive.sensorId,
+  temperature: uiHive.temperature || 25.0,  // Default value if not provided
+  humidity: uiHive.humidity || 40.0,        // Default value if not provided
+  weight: uiHive.weight || 10.0,            // Default value if not provided
+  sound: uiHive.sound,
+  status: uiHive.status || 'healthy',       // Default value if not provided
+  last_updated: uiHive.lastUpdated || new Date().toISOString(),
+  created_at: uiHive.createdAt || new Date().toISOString(),
+  updated_at: uiHive.updatedAt || new Date().toISOString()
 });
 
 const mapServiceApiaryToUIApiary = (serviceApiary: ServiceApiary): Apiary => ({
   id: serviceApiary.id,
   name: serviceApiary.name,
   location: serviceApiary.location || '',
-  imageUrl: undefined // We don't store this in the service
+  imageUrl: serviceApiary.imageurl || 'https://images.unsplash.com/photo-1587236317816-56161f5ee7e6?auto=format&fit=crop&q=80&w=800'
 });
 
-const mapUIApiaryToServiceApiary = (uiApiary: Omit<Apiary, 'id'>): Omit<ServiceApiary, 'id'> => ({
+const mapUIApiaryToServiceApiary = (uiApiary: Omit<Apiary, 'id'>): Omit<ServiceApiary, 'id' | 'profile_id'> => ({
   name: uiApiary.name,
   location: uiApiary.location,
+  imageurl: uiApiary.imageUrl
 });
 
 const mapServiceInspectionLogToUIInspectionLog = (serviceLog: ServiceInspectionLog): InspectionLog => ({
@@ -164,7 +182,7 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
     // First load initial data directly
     const loadInitialHives = async () => {
       try {
-        const hivesData = await fetchHives();
+        const hivesData = await serviceFetchHives();
         const uiHives = hivesData.map(mapServiceHiveToUIHive);
         setHives(uiHives);
         setIsLoading(false);
@@ -179,8 +197,7 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
     
     try {
       // Initialize subscription to hive data
-      const unsubscribe = subscribeToHives((updatedHives) => {
-        // Convert service hives to UI hives
+      const hivesSubscription = subscribeToHives((updatedHives) => {
         const uiHives = updatedHives.map(mapServiceHiveToUIHive);
         setHives(uiHives);
         setIsLoading(false);
@@ -199,7 +216,7 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
       
       // Cleanup subscription and timeout on unmount
       return () => {
-        unsubscribe(); // Direct function call, not an object method
+        hivesSubscription();
         clearTimeout(timeoutId);
       };
     } catch (err) {
@@ -216,7 +233,7 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
     
     const fetchApiariesData = async () => {
       try {
-        const apiaryData = await fetchApiaries();
+        const apiaryData = await serviceFetchApiaries();
         setApiaries(apiaryData.map(mapServiceApiaryToUIApiary));
         setIsLoading(false);
       } catch (err) {
@@ -230,8 +247,10 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
     
     try {
       // Set up real-time subscription
-      const unsubscribe = subscribeToApiaries((updatedApiaries) => {
-        setApiaries(updatedApiaries.map(mapServiceApiaryToUIApiary));
+      const apiariesSubscription = subscribeToApiaries((updatedApiaries) => {
+        const uiApiaries = updatedApiaries.map(mapServiceApiaryToUIApiary);
+        setApiaries(uiApiaries);
+        setIsLoading(false);
         setError(null); // Clear any existing errors on successful update
       }, (error) => {
         console.error('Supabase subscription error:', error);
@@ -246,7 +265,7 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
       }, 10000); // 10 second timeout
       
       return () => {
-        unsubscribe();
+        apiariesSubscription();
         clearTimeout(timeoutId);
       };
     } catch (err) {
@@ -256,17 +275,14 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const fetchApiaries = async () => {
-    const { data, error } = await supabase
-        .from('apiaries')
-        .select('*'); // Fetch all apiaries
-
-    if (error) {
+  const fetchApiaries = async (): Promise<Apiary[]> => {
+    try {
+        const apiaryData = await serviceFetchApiaries();
+        return apiaryData.map(mapServiceApiaryToUIApiary);
+    } catch (error) {
         console.error('Error fetching apiaries:', error);
         return [];
     }
-
-    return data.map(mapServiceApiaryToUIApiary); // Map to UI format
   };
 
   // Load inspection logs for all hives
@@ -333,19 +349,14 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
   }, [hives]);
 
   // Add a new apiary
-  const addApiary = async (apiary: Omit<Apiary, 'id'>) => {
+  const addApiary = async (apiary: Omit<Apiary, 'id'>): Promise<void> => {
     try {
         const serviceApiary = mapUIApiaryToServiceApiary(apiary);
-        const { data, error } = await supabase
-            .from('apiaries')
-            .insert([serviceApiary]);
-
-        if (error) {
-            throw new Error(error.message);
-        }
-
-        if (data) {
-            setApiaries((prev) => [...prev, data[0]]);
+        const newApiary = await serviceAddApiary(serviceApiary);
+        
+        if (newApiary) {
+            const uiApiary = mapServiceApiaryToUIApiary(newApiary);
+            setApiaries((prev) => [...prev, uiApiary]);
         }
     } catch (err) {
         console.error('Error adding apiary:', err);
@@ -355,12 +366,17 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
 
   // Add a new hive
   const addHive = async (hiveData: Omit<Hive, 'id'>): Promise<void> => {
-    const { data, error } = await supabase
-        .from('hives')
-        .insert([hiveData]);
-
-    if (error) {
-        throw new Error(error.message);
+    try {
+      const serviceHive = mapUIHiveToServiceHive(hiveData);
+      const newHive = await serviceAddHive(serviceHive);
+      
+      if (newHive) {
+        const uiHive = mapServiceHiveToUIHive(newHive);
+        setHives(prevHives => [...prevHives, uiHive]);
+      }
+    } catch (err) {
+      console.error('Error adding hive:', err);
+      setError('Failed to add hive');
     }
   };
 
@@ -372,9 +388,14 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
       
       if (updates.name !== undefined) serviceUpdates.name = updates.name;
       if (updates.apiaryId !== undefined) serviceUpdates.apiary_id = updates.apiaryId;
-      if (updates.sensorId !== undefined) serviceUpdates.sensor_id = updates.sensorId;
+      if (updates.temperature !== undefined) serviceUpdates.temperature = updates.temperature;
+      if (updates.humidity !== undefined) serviceUpdates.humidity = updates.humidity;
+      if (updates.weight !== undefined) serviceUpdates.weight = updates.weight;
+      if (updates.sound !== undefined) serviceUpdates.sound = updates.sound;
+      if (updates.status !== undefined) serviceUpdates.status = updates.status;
+      if (updates.lastUpdated !== undefined) serviceUpdates.last_updated = updates.lastUpdated;
       
-      const updatedHive = await apiUpdateHive(id, serviceUpdates);
+      const updatedHive = await serviceUpdateHive(id, serviceUpdates);
       
       if (updatedHive) {
         // Update happens through the subscription, but let's update locally for immediate feedback
@@ -394,13 +415,13 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
       setHives(prevHives => prevHives.filter(h => h.id !== id));
       
       // Then delete from database
-      const success = await apiDeleteHive(id);
+      const success = await serviceDeleteHive(id);
       
       if (!success) {
-        // If deletion failed, restore the hive
-        const hive = await fetchHiveById(id);
+        // If deletion failed, restore the hive from the current state
+        const hive = getHiveById(id);
         if (hive) {
-          setHives(prevHives => [...prevHives, mapServiceHiveToUIHive(hive)]);
+          setHives(prevHives => [...prevHives, hive]);
         }
         throw new Error('Failed to delete hive');
       }
@@ -417,7 +438,7 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
       const serviceLog = mapUIInspectionLogToServiceInspectionLog(log);
       const actions = log.actions || [];
       
-      const newLog = await apiAddInspectionLog(serviceLog, actions);
+      const newLog = await serviceAddInspectionLog(serviceLog, actions);
       
       if (newLog) {
         const uiLog = mapServiceInspectionLogToUIInspectionLog(newLog);
@@ -433,7 +454,9 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
   const getTotalApiaries = () => apiaries.length;
   const getTotalHives = () => hives.length;
   const getHivesByApiaryId = (apiaryId: string) => hives.filter(h => h.apiaryId === apiaryId);
-  const getHiveById = (id: string) => hives.find(h => h.id === id);
+  const getHiveById = (id: string): Hive | undefined => {
+    return hives.find(hive => hive.id === id);
+  };
   const getApiaryById = (id: string) => apiaries.find(a => a.id === id);
   const getInspectionLogsByHiveId = (hiveId: string) => 
     inspectionLogs.filter(log => log.hiveId === hiveId);
@@ -442,12 +465,21 @@ export function BeekeepingProvider({ children }: { children: ReactNode }) {
   // Implement real-time data subscription
   const subscribeToSensorData = (hiveId: string) => {
     return supabase
-        .from(`sensor_data:hive_id=eq.${hiveId}`)
-        .on('INSERT', (payload: any) => {
-            console.log('New sensor data:', payload.new);
-            // Handle new sensor data (update state, etc.)
-        })
-        .subscribe();
+      .channel(`sensor_data:hive_id=eq.${hiveId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sensor_data',
+          filter: `hive_id=eq.${hiveId}`
+        },
+        (payload: any) => {
+          console.log('New sensor data:', payload.new);
+          // Handle new sensor data (update state, etc.)
+        }
+      )
+      .subscribe();
   };
 
   // Context value

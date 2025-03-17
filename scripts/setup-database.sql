@@ -1,9 +1,11 @@
 -- Apiaries Table
 CREATE TABLE IF NOT EXISTS apiaries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   location TEXT,
   notes TEXT,
+  image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -11,6 +13,7 @@ CREATE TABLE IF NOT EXISTS apiaries (
 -- Hives Table
 CREATE TABLE IF NOT EXISTS hives (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   apiary_id UUID REFERENCES apiaries(id) ON DELETE CASCADE,
   temperature DECIMAL(5,2) NOT NULL DEFAULT 25.0,
@@ -26,6 +29,7 @@ CREATE TABLE IF NOT EXISTS hives (
 -- Inspection Logs Table
 CREATE TABLE IF NOT EXISTS inspection_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   hive_id UUID REFERENCES hives(id) ON DELETE CASCADE,
   date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   queen_spotted BOOLEAN DEFAULT false,
@@ -42,6 +46,7 @@ CREATE TABLE IF NOT EXISTS inspection_logs (
 -- Inspection Actions Table (many-to-one relationship with inspection_logs)
 CREATE TABLE IF NOT EXISTS inspection_actions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   inspection_id UUID REFERENCES inspection_logs(id) ON DELETE CASCADE,
   action TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -50,6 +55,7 @@ CREATE TABLE IF NOT EXISTS inspection_actions (
 -- Historical Data Table for Time Series Analysis
 CREATE TABLE IF NOT EXISTS historical_data (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   hive_id UUID REFERENCES hives(id) ON DELETE CASCADE,
   date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   temperature DECIMAL(5,2),
@@ -59,41 +65,102 @@ CREATE TABLE IF NOT EXISTS historical_data (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create RLS Policies for Public Access
--- Note: In a production app, you would want to limit access based on user authentication
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_apiaries_user_id ON apiaries(user_id);
+CREATE INDEX IF NOT EXISTS idx_hives_user_id ON hives(user_id);
+CREATE INDEX IF NOT EXISTS idx_inspection_logs_user_id ON inspection_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_inspection_actions_user_id ON inspection_actions(user_id);
+CREATE INDEX IF NOT EXISTS idx_historical_data_user_id ON historical_data(user_id);
+
+-- Enable Row Level Security (RLS)
 ALTER TABLE apiaries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hives ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inspection_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inspection_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE historical_data ENABLE ROW LEVEL SECURITY;
 
--- Create policies for anon access (for demo purposes)
-CREATE POLICY "Allow anon select for apiaries" ON apiaries FOR SELECT USING (true);
-CREATE POLICY "Allow anon insert for apiaries" ON apiaries FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow anon update for apiaries" ON apiaries FOR UPDATE USING (true);
-CREATE POLICY "Allow anon delete for apiaries" ON apiaries FOR DELETE USING (true);
+-- Create RLS policies
+CREATE POLICY "Users can only view their own apiaries"
+  ON apiaries FOR SELECT
+  USING (auth.uid() = user_id);
 
-CREATE POLICY "Allow anon select for hives" ON hives FOR SELECT USING (true);
-CREATE POLICY "Allow anon insert for hives" ON hives FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow anon update for hives" ON hives FOR UPDATE USING (true);
-CREATE POLICY "Allow anon delete for hives" ON hives FOR DELETE USING (true);
+CREATE POLICY "Users can only insert their own apiaries"
+  ON apiaries FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Allow anon select for inspection_logs" ON inspection_logs FOR SELECT USING (true);
-CREATE POLICY "Allow anon insert for inspection_logs" ON inspection_logs FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow anon update for inspection_logs" ON inspection_logs FOR UPDATE USING (true);
-CREATE POLICY "Allow anon delete for inspection_logs" ON inspection_logs FOR DELETE USING (true);
+CREATE POLICY "Users can only update their own apiaries"
+  ON apiaries FOR UPDATE
+  USING (auth.uid() = user_id);
 
-CREATE POLICY "Allow anon select for inspection_actions" ON inspection_actions FOR SELECT USING (true);
-CREATE POLICY "Allow anon insert for inspection_actions" ON inspection_actions FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow anon update for inspection_actions" ON inspection_actions FOR UPDATE USING (true);
-CREATE POLICY "Allow anon delete for inspection_actions" ON inspection_actions FOR DELETE USING (true);
+CREATE POLICY "Users can only delete their own apiaries"
+  ON apiaries FOR DELETE
+  USING (auth.uid() = user_id);
 
-CREATE POLICY "Allow anon select for historical_data" ON historical_data FOR SELECT USING (true);
-CREATE POLICY "Allow anon insert for historical_data" ON historical_data FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow anon update for historical_data" ON historical_data FOR UPDATE USING (true);
-CREATE POLICY "Allow anon delete for historical_data" ON historical_data FOR DELETE USING (true);
+CREATE POLICY "Users can only view their own hives"
+  ON hives FOR SELECT
+  USING (auth.uid() = user_id);
 
--- Setup Realtime Publish
+CREATE POLICY "Users can only insert their own hives"
+  ON hives FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can only update their own hives"
+  ON hives FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only delete their own hives"
+  ON hives FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only view their own inspection logs"
+  ON inspection_logs FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only insert their own inspection logs"
+  ON inspection_logs FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can only update their own inspection logs"
+  ON inspection_logs FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only delete their own inspection logs"
+  ON inspection_logs FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only view their own inspection actions"
+  ON inspection_actions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only insert their own inspection actions"
+  ON inspection_actions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can only update their own inspection actions"
+  ON inspection_actions FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only delete their own inspection actions"
+  ON inspection_actions FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only view their own historical data"
+  ON historical_data FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only insert their own historical data"
+  ON historical_data FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can only update their own historical data"
+  ON historical_data FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can only delete their own historical data"
+  ON historical_data FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Set up real-time subscriptions
 BEGIN;
   -- Drop if exists
   DROP publication IF EXISTS supabase_realtime;

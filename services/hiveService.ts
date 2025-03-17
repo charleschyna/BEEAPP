@@ -4,13 +4,16 @@ import { PostgrestError } from '@supabase/supabase-js';
 // Types that match our database schema
 export interface Apiary {
   id: string;
+  profile_id: string;
   name: string;
   location?: string;
-  notes?: string;
+  imageurl?: string;
+  image_id?: string;
 }
 
 export interface Hive {
   id: string;
+  user_id: string;
   name: string;
   apiary_id: string;
   temperature: number;
@@ -19,6 +22,8 @@ export interface Hive {
   sound?: number;
   status: 'healthy' | 'warning' | 'danger';
   last_updated: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface InspectionLog {
@@ -48,9 +53,13 @@ export interface HistoricalData {
 // API functions for Apiaries
 export const fetchApiaries = async (): Promise<Apiary[]> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { data, error } = await supabase
       .from('apiaries')
       .select('*')
+      .eq('profile_id', user.id)
       .order('name');
     
     if (error) throw error;
@@ -61,11 +70,14 @@ export const fetchApiaries = async (): Promise<Apiary[]> => {
   }
 };
 
-export const addApiary = async (apiary: Omit<Apiary, 'id'>): Promise<Apiary | null> => {
+export const addApiary = async (apiary: Omit<Apiary, 'id' | 'profile_id'>): Promise<Apiary | null> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { data, error } = await supabase
       .from('apiaries')
-      .insert(apiary)
+      .insert([{ ...apiary, profile_id: user.id }])
       .select()
       .single();
     
@@ -79,10 +91,14 @@ export const addApiary = async (apiary: Omit<Apiary, 'id'>): Promise<Apiary | nu
 
 export const updateApiary = async (id: string, updates: Partial<Apiary>): Promise<Apiary | null> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { data, error } = await supabase
       .from('apiaries')
       .update(updates)
       .eq('id', id)
+      .eq('profile_id', user.id)
       .select()
       .single();
     
@@ -96,10 +112,14 @@ export const updateApiary = async (id: string, updates: Partial<Apiary>): Promis
 
 export const deleteApiary = async (id: string): Promise<boolean> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { error } = await supabase
       .from('apiaries')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('profile_id', user.id);
     
     if (error) throw error;
     return true;
@@ -112,9 +132,13 @@ export const deleteApiary = async (id: string): Promise<boolean> => {
 // API functions for Hives
 export const fetchHives = async (): Promise<Hive[]> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { data, error } = await supabase
       .from('hives')
       .select('*')
+      .eq('user_id', user.id)
       .order('name');
     
     if (error) throw error;
@@ -127,10 +151,14 @@ export const fetchHives = async (): Promise<Hive[]> => {
 
 export const fetchHivesByApiaryId = async (apiaryId: string): Promise<Hive[]> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { data, error } = await supabase
       .from('hives')
       .select('*')
       .eq('apiary_id', apiaryId)
+      .eq('user_id', user.id)
       .order('name');
     
     if (error) throw error;
@@ -141,11 +169,14 @@ export const fetchHivesByApiaryId = async (apiaryId: string): Promise<Hive[]> =>
   }
 };
 
-export const addHive = async (hive: Omit<Hive, 'id'>): Promise<Hive | null> => {
+export const addHive = async (hive: Omit<Hive, 'id' | 'user_id'>): Promise<Hive | null> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { data, error } = await supabase
       .from('hives')
-      .insert(hive)
+      .insert([{ ...hive, user_id: user.id }])
       .select()
       .single();
     
@@ -159,10 +190,14 @@ export const addHive = async (hive: Omit<Hive, 'id'>): Promise<Hive | null> => {
 
 export const updateHive = async (id: string, updates: Partial<Hive>): Promise<Hive | null> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { data, error } = await supabase
       .from('hives')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single();
     
@@ -176,10 +211,14 @@ export const updateHive = async (id: string, updates: Partial<Hive>): Promise<Hi
 
 export const deleteHive = async (id: string): Promise<boolean> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     const { error } = await supabase
       .from('hives')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
     
     if (error) throw error;
     return true;
@@ -192,11 +231,15 @@ export const deleteHive = async (id: string): Promise<boolean> => {
 // API functions for Inspection Logs
 export const fetchInspectionLogs = async (hiveId: string): Promise<InspectionLog[]> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+
     // First get the logs
     const { data: logs, error } = await supabase
       .from('inspection_logs')
       .select('*')
       .eq('hive_id', hiveId)
+      .eq('user_id', user.id)
       .order('date', { ascending: false });
     
     if (error) {
@@ -217,7 +260,8 @@ export const fetchInspectionLogs = async (hiveId: string): Promise<InspectionLog
       const { data: actions, error: actionsError } = await supabase
         .from('inspection_actions')
         .select('action')
-        .eq('inspection_id', log.id);
+        .eq('inspection_id', log.id)
+        .eq('user_id', user.id);
         
       if (actionsError) throw actionsError;
       
@@ -332,10 +376,14 @@ export const subscribeToHives = (
       },
       async (payload) => {
         try {
-          // When any change occurs, fetch all hives
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('No authenticated user');
+
+          // When any change occurs, fetch all hives for the current user
           const { data, error } = await supabase
             .from('hives')
             .select('*')
+            .eq('user_id', user.id)
             .order('name');
           
           if (error) {
@@ -372,10 +420,14 @@ export const subscribeToApiaries = (
       },
       async (payload) => {
         try {
-          // When any change occurs, fetch all apiaries
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('No authenticated user');
+
+          // When any change occurs, fetch all apiaries for the current user
           const { data, error } = await supabase
             .from('apiaries')
             .select('*')
+            .eq('profile_id', user.id)
             .order('name');
           
           if (error) {

@@ -26,11 +26,10 @@ export function AddApiaryModal({ visible, onClose }: AddApiaryModalProps) {
 
   const handleSubmit = () => {
     if (name.trim() && location.trim()) {
-      // Using a placeholder image for now
       addApiary({
         name: name.trim(),
         location: location.trim(),
-        imageUrl: 'https://images.unsplash.com/photo-1587236317816-56161f5ee7e6?auto=format&fit=crop&q=80&w=800',
+        imageUrl: 'https://images.unsplash.com/photo-1587236317816-56161f5ee7e6?auto=format&fit=crop&q=80&w=800'
       });
       
       // Reset form and close modal
