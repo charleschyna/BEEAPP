@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useBeekeeping } from '@/context/BeekeepingContext';
@@ -7,16 +7,7 @@ import { Thermometer, Droplets, Scale, Volume2, Plus, AlertTriangle, RefreshCw }
 
 export default function HivesScreen() {
   const router = useRouter();
-  const { hives, getApiaryById, isLoading, error } = useBeekeeping();
-  
-  const getStatusColor = (status: 'healthy' | 'warning' | 'danger') => {
-    switch(status) {
-      case 'healthy': return colors.success;
-      case 'warning': return colors.warning;
-      case 'danger': return colors.danger;
-      default: return colors.text;
-    }
-  };
+  const { hives, getApiaryById, isLoading, error, deleteHive } = useBeekeeping();
   
   const navigateToHiveDetails = (id: string) => {
     router.push(`/hive/${id}`);
@@ -30,6 +21,32 @@ export default function HivesScreen() {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  const handleDeleteHive = async (id: string) => {
+    Alert.alert(
+      'Delete Hive',
+      'Are you sure you want to delete this hive? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteHive(id);
+            } catch (err) {
+              Alert.alert('Error', 'Failed to delete hive');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const [menuVisible, setMenuVisible] = useState<string | null>(null);
 
   return (
     <View style={styles.container}>
@@ -85,45 +102,42 @@ export default function HivesScreen() {
                 >
                   <View style={styles.hiveHeader}>
                     <Text style={styles.hiveName}>{hive.name}</Text>
-                    <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(hive.status) }]}>
-                      {hive.status !== 'healthy' && <AlertTriangle size={14} color={colors.white} />}
-                      <Text style={styles.statusText}>
-                        {hive.status.charAt(0).toUpperCase() + hive.status.slice(1)}
-                      </Text>
-                    </View>
                   </View>
                   
                   <Text style={styles.apiaryName}>
-                    {apiary ? apiary.name : 'Unknown Apiary'}
+                    {apiary ? apiary.name : 'No Apiary Assigned'}
                   </Text>
-                  
-                  <View style={styles.metricsContainer}>
-                    <View style={styles.metricItem}>
-                      <Thermometer size={16} color={colors.primary} />
-                      <Text style={styles.metricValue}>{hive.temperature}°C</Text>
-                    </View>
-                    
-                    <View style={styles.metricItem}>
-                      <Droplets size={16} color={colors.primary} />
-                      <Text style={styles.metricValue}>{hive.humidity}%</Text>
-                    </View>
-                    
-                    <View style={styles.metricItem}>
-                      <Scale size={16} color={colors.primary} />
-                      <Text style={styles.metricValue}>{hive.weight} kg</Text>
-                    </View>
-                    
-                    {hive.sound && (
-                      <View style={styles.metricItem}>
-                        <Volume2 size={16} color={colors.primary} />
-                        <Text style={styles.metricValue}>{hive.sound} dB</Text>
-                      </View>
-                    )}
-                  </View>
                   
                   <Text style={styles.lastUpdated}>
                     Last updated: {formatDate(hive.lastUpdated)}
                   </Text>
+                  <View style={styles.actionsContainer}>
+                    <TouchableOpacity 
+                      style={styles.detailsButton}
+                      onPress={() => navigateToHiveDetails(hive.id)}
+                    >
+                      <Text style={styles.detailsButtonText}>Details</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.optionsButton}
+                      onPress={() => setMenuVisible(hive.id)}
+                    >
+                      <Text style={styles.optionsButtonText}>•••</Text>
+                    </TouchableOpacity>
+                    {menuVisible === hive.id && (
+                      <View style={styles.optionsMenu}>
+                        <TouchableOpacity 
+                          style={styles.menuItem}
+                          onPress={() => {
+                            setMenuVisible(null);
+                            handleDeleteHive(hive.id);
+                          }}
+                        >
+                          <Text style={styles.menuItemText}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 </Pressable>
               );
             })}
@@ -239,55 +253,61 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.text,
   },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: colors.white,
-    fontWeight: '600',
-    fontSize: 12,
-    marginLeft: 2,
-  },
   apiaryName: {
     color: colors.textSecondary,
     marginBottom: spacing.md,
-  },
-  metricsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: spacing.sm,
-  },
-  metricItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  metricValue: {
-    color: colors.text,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  emptyState: {
-    padding: spacing.lg,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-  },
-  emptyStateText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
   lastUpdated: {
     ...typography.caption,
     color: colors.textSecondary,
     marginTop: spacing.sm,
-  }
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  detailsButton: {
+    backgroundColor: colors.primary,
+    padding: spacing.sm,
+    borderRadius: 8,
+    flex: 1,
+  },
+  detailsButtonText: {
+    color: colors.white,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  optionsButton: {
+    backgroundColor: colors.backgroundSecondary,
+    padding: spacing.sm,
+    borderRadius: 8,
+    width: 40,
+  },
+  optionsButtonText: {
+    color: colors.text,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  optionsMenu: {
+    position: 'absolute',
+    right: 0,
+    top: 40,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: spacing.sm,
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 1,
+  },
+  menuItem: {
+    padding: spacing.sm,
+  },
+  menuItemText: {
+    color: colors.text,
+  },
 });

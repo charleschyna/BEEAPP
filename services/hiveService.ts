@@ -200,16 +200,18 @@ export const fetchInspectionLogs = async (hiveId: string): Promise<InspectionLog
       .order('date', { ascending: false });
     
     if (error) {
-      // If the table doesn't exist yet, just return an empty array
-      if (error.code === '42P01') { // PostgreSQL error code for relation does not exist
-        console.error(`Error fetching inspection logs for hive ${hiveId}: ${JSON.stringify(error)}`);
+      // If table doesn't exist, return empty array instead of throwing
+      if (error.code === '42P01') { // PostgreSQL code for "relation does not exist"
+        console.warn('Inspection logs table does not exist yet. Returning empty array.');
         return [];
       }
       throw error;
     }
     
-    if (!logs || logs.length === 0) return [];
-    
+    if (!logs || logs.length === 0) {
+      return [];
+    }
+
     // Then get the actions for each log
     const inspectionLogs = await Promise.all(logs.map(async (log) => {
       const { data: actions, error: actionsError } = await supabase
@@ -227,8 +229,8 @@ export const fetchInspectionLogs = async (hiveId: string): Promise<InspectionLog
     
     return inspectionLogs;
   } catch (error) {
-    console.error(`Error fetching inspection logs for hive ${hiveId}:`, error);
-    return [];
+    console.error('Error fetching inspection logs:', error);
+    return []; // Return empty array on error instead of throwing
   }
 };
 
@@ -295,12 +297,13 @@ export const fetchHistoricalData = async (hiveId: string): Promise<HistoricalDat
       .from('historical_data')
       .select('*')
       .eq('hive_id', hiveId)
-      .order('date', { ascending: true });
+      .order('date', { ascending: false })
+      .limit(30); // Last 30 data points
     
     if (error) {
-      // If the table doesn't exist yet, just return an empty array
-      if (error.code === '42P01') { // PostgreSQL error code for relation does not exist
-        console.error(`Error fetching historical data for hive ${hiveId}: ${JSON.stringify(error)}`);
+      // If table doesn't exist, return empty array instead of throwing
+      if (error.code === '42P01') { // PostgreSQL code for "relation does not exist"
+        console.warn('Historical data table does not exist yet. Returning empty array.');
         return [];
       }
       throw error;
@@ -308,8 +311,8 @@ export const fetchHistoricalData = async (hiveId: string): Promise<HistoricalDat
     
     return data || [];
   } catch (error) {
-    console.error(`Error fetching historical data for hive ${hiveId}:`, error);
-    return [];
+    console.error('Error fetching historical data:', error);
+    return []; // Return empty array on error instead of throwing
   }
 };
 

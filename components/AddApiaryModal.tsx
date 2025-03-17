@@ -13,7 +13,7 @@ import {
 import { colors, spacing, typography } from '@/constants/theme';
 import { useBeekeeping } from '@/context/BeekeepingContext';
 import { X } from 'lucide-react-native';
-
+ 
 interface AddApiaryModalProps {
   visible: boolean;
   onClose: () => void;

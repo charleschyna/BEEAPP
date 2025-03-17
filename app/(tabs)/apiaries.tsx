@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Image, Pressable, Platform, AccessibilityRole } from 'react-native';
 import { colors, spacing, typography } from '@/constants/theme';
 import { MapPin, Plus } from 'lucide-react-native';
@@ -9,9 +9,18 @@ import { AddApiaryModal } from '@/components/AddApiaryModal';
 type Role = 'button' | 'link' | 'tab' | 'checkbox' | 'radio' | 'switch';
 
 export default function ApiariesScreen() {
-  const { apiaries, getHivesByApiaryId } = useBeekeeping();
+  const { apiaries, setApiaries, fetchApiaries, getHivesByApiaryId } = useBeekeeping();
   const [addApiaryModalVisible, setAddApiaryModalVisible] = useState(false);
   
+  useEffect(() => {
+    const getApiaries = async () => {
+      const fetchedApiaries = await fetchApiaries(); // Fetch apiaries from the database
+      setApiaries(fetchedApiaries); // Update local state with fetched apiaries
+    };
+
+    getApiaries();
+  }, []); // Empty dependency array to run once on mount
+
   const pressableProps = Platform.select({
     native: {
       accessibilityRole: 'button' as AccessibilityRole,

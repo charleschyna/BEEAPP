@@ -11,6 +11,7 @@ export const colors = {
   textSecondary: '#757575',
   background: '#FAFAFA',
   backgroundLight: '#f9fafc',
+  backgroundSecondary: '#f5f5f5',
   white: '#FFFFFF',
   border: '#E0E0E0',
   overlay: 'rgba(0, 0, 0, 0.5)',

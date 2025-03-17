@@ -15,6 +15,7 @@ export default function AddHiveScreen() {
 
   const [name, setName] = useState('');
   const [apiaryId, setApiaryId] = useState('');
+  const [sensorId, setSensorId] = useState('');
   const [apiaries, setApiaries] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,10 +29,20 @@ export default function AddHiveScreen() {
       
       try {
         const apiaryData = await fetchApiaries();
-        setApiaries(apiaryData);
+        
+        if (apiaryData.length === 0) {
+          // Handle the case where no apiaries exist
+          setError('No apiaries found. Please add an apiary first before adding hives.');
+        } else {
+          setApiaries(apiaryData);
+          // Auto-select the first apiary if none is selected
+          if (!apiaryId && apiaryData.length > 0) {
+            setApiaryId(apiaryData[0].id);
+          }
+        }
       } catch (err) {
         console.error('Error fetching apiaries:', err);
-        setError('Failed to load apiaries. Please try again.');
+        setError('Failed to load apiaries. Please check your connection and try again.');
       } finally {
         setIsLoading(false);
       }
@@ -52,6 +63,11 @@ export default function AddHiveScreen() {
       return;
     }
 
+    if (!sensorId.trim()) {
+      Alert.alert('Error', 'Please enter a sensor ID');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       
@@ -59,12 +75,7 @@ export default function AddHiveScreen() {
       await addHive({
         name: name.trim(),
         apiaryId,
-        temperature: 34.5, // Default values
-        humidity: 55.0,
-        weight: 25.0,
-        sound: 40.0,
-        status: 'healthy',
-        lastUpdated: new Date().toISOString(),
+        sensorId: sensorId.trim(),
       });
       
       // Return to the hives list
@@ -166,6 +177,17 @@ export default function AddHiveScreen() {
               ))}
             </Picker>
           </View>
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Sensor ID</Text>
+          <TextInput
+            style={styles.input}
+            value={sensorId}
+            onChangeText={setSensorId}
+            placeholder="Enter sensor ID"
+            autoCapitalize="none"
+          />
         </View>
 
         <TouchableOpacity 

@@ -50,13 +50,18 @@ export default function HiveDetailScreen() {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   
-  const getStatusColor = (status: 'healthy' | 'warning' | 'danger') => {
+  const getStatusColor = (status: 'healthy' | 'warning' | 'danger' | undefined) => {
     switch (status) {
       case 'healthy': return colors.success;
       case 'warning': return colors.warning;
       case 'danger': return colors.danger;
       default: return colors.text;
     }
+  };
+  
+  const formatStatusText = (status: 'healthy' | 'warning' | 'danger' | undefined) => {
+    if (!status) return 'Unknown';
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
   
   const getBroodPatternColor = (pattern: 'excellent' | 'good' | 'fair' | 'poor') => {
@@ -192,14 +197,14 @@ export default function HiveDetailScreen() {
               <View style={styles.summaryHeader}>
                 <View>
                   <Text style={styles.apiaryName}>
-                    {apiary?.name || 'Unknown Apiary'}
+                    {apiary ? apiary.name : 'No Apiary Assigned'}
                   </Text>
                   <Text style={styles.hiveTitle}>{hive.name}</Text>
                 </View>
                 
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(hive.status) }]}>
                   <Text style={styles.statusText}>
-                    {hive.status.charAt(0).toUpperCase() + hive.status.slice(1)}
+                    {formatStatusText(hive.status)}
                   </Text>
                 </View>
               </View>
